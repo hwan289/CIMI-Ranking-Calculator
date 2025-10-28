@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>R Type 8 Outlier Calculator</title>
+    <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,8 +13,9 @@
                     colors: {
                         'gemini-blue': '#1A73E8',
                         'gemini-light': '#E8F0FE',
-                        'interquartile': '#34A853',
-                        'outlier-red': '#EA4335'
+                        'interquartile': '#34A853', /* This is the green used for success */
+                        'outlier-red': '#EA4335',
+                        'adjustment-purple': '#8E44AD'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -29,126 +31,289 @@
         }
         .card {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.3s ease-in-out; /* Enable smooth transition for the animation */
+        }
+        /* Custom class for the pulse/highlight animation effect (Green flash) */
+        .card-highlight {
+            box-shadow: 0 0 0 4px rgb(52, 211, 153), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         .code-output {
             background-color: #1e293b;
             color: #f1f5f9;
             word-break: break-all;
         }
+        .adjusted-list {
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            min-height: 100px;
+        }
+        .adjusted-item-lower {
+            color: #1D4ED8;
+        }
+        .adjusted-item-upper {
+            color: #B91C1C;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-6xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-extrabold text-gray-800">
-                Outlier Detector: R Type 8 Quantile Method
+                Outlier Detector & Adjustment: R Type 8 Quantile Method
             </h1>
-            <p class="text-lg text-gray-600 mt-2">
-                Calculate outliers using the Type 8 quantile definition based on Hyndman, R. J., & Fan, Y. (1996). Sample Quantiles in Statistical Packages. The American Statistician, 50(4), 361–365. https://doi.org/10.1080/00031305.1996.10473566
-            </p>
+            <!-- The descriptive sentence has been removed -->
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-xl card">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Input Card (Col 1) -->
+            <div class="bg-white p-6 rounded-xl card lg:col-span-1">
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4">1. Input Your Data</h2>
                 <textarea 
                     id="dataInput" 
                     rows="10" 
                     placeholder="Enter your numbers here, separated by spaces, commas, or newlines. E.g.: 88, 92, 95, 105, 5, 208"
                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-gemini-blue focus:ring-gemini-blue transition duration-150"
-                >88, 92, 95, 98, 101, 105, 107, 109, 110, 5, 200, 208</textarea>
+                >88, 92, 95, 98, 101, 105, 107, 109, 110, 5, 200, 208, 215, 220, 1</textarea>
                 
                 <button 
                     id="calculateBtn" 
                     onclick="calculateOutliers()"
                     class="mt-4 w-full bg-gemini-blue text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition duration-150 text-lg"
                 >
-                    Calculate Outliers
+                    Calculate & Adjust
                 </button>
             </div>
 
-            <div class="bg-white p-6 rounded-xl card">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Results & Fences (Max 15 Decimal Precision)</h2>
-                <div id="resultsDisplay" class="space-y-4">
-                    <p class="text-gray-500 italic">Press 'Calculate Outliers' to see the results.</p>
+            <!-- Results Card (Col 2 & 3) -->
+            <div class="lg:col-span-2 space-y-8">
+                <div id="resultsDisplay" class="bg-white p-6 rounded-xl card">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Summary & Detected Outliers</h2>
+                    <p class="text-gray-500 italic">Press 'Calculate & Adjust' to see the results.</p>
+                </div>
+
+                <!-- Adjustment Result Card -->
+                <div id="adjustmentDisplay" class="bg-white p-6 rounded-xl card">
+                    <h2 class="text-2xl font-semibold text-adjustment-purple mb-4">3. Outlier Adjusted Values</h2>
+                    <p class="text-gray-500 italic">The adjusted values will appear here.</p>
                 </div>
             </div>
         </div>
+
+        <!-- New Section: R Type 8 Explanation -->
+        <section class="mt-12 p-6 bg-white rounded-xl card">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">R Type 8 Quantile Definition (Hyndman and Fan, 1996)</h2>
+            
+            <h3 class="text-xl font-medium text-gray-700 mb-2">Formula for Index <span class="font-mono text-gemini-blue">h</span></h3>
+            <div class="bg-gray-100 p-4 rounded-lg font-mono text-lg text-center">
+                <span class="font-mono font-bold text-gemini-blue">h</span> = p &times; (<span class="font-mono font-bold text-gemini-blue">n</span> + 1/3) + 1/3
+            </div>
+
+            <p class="text-sm text-gray-500 mt-2">
+                Where:
+                <ul class="list-disc list-inside ml-4 mt-2 text-gray-600 space-y-1 text-base">
+                    <li><strong class="font-mono">p</strong> is the probability (e.g., 0.25 for Q1, 0.75 for Q3).</li>
+                    <li><strong class="font-mono">n</strong> is the number of data points.</li>
+                    <li><strong class="font-mono text-gray-800">h</strong> is the continuous index. The quantile is found by interpolating between the value at index <code class="font-mono text-blue-600">i = floor(h)</code> and the value at index <code class="font-mono text-blue-600">i+1</code>, using the fractional part <code class="font-mono text-blue-600">g = h - i</code>.</li>
+                </ul>
+            </p>
+            
+            <p class="text-gray-600 mt-4">
+                This type is recommended for median unbiased estimation when the distribution is heavy-tailed.
+            </p>
+
+            <h3 class="text-xl font-medium text-gray-700 mb-2 mt-6">Citation</h3>
+            <p class="text-sm text-gray-500">
+                Hyndman, R. J., & Fan, Y. (1996). Sample quantiles in statistical packages. <span class="italic">The American Statistician, 50(4)</span>, 361-365. 
+                <a href="https://doi.org/10.1080/00031305.1996.10473566" class="text-gemini-blue hover:underline" target="_blank">https://doi.org/10.1080/00031305.1996.10473566</a>
+            </p>
+        </section>
+
+        <!-- Footer with Last Edited Time -->
+        <footer class="mt-8 text-center text-sm text-gray-500">
+            Last Updated: October 27, 2025
+        </footer>
+
     </div>
 
     <script>
         const PRECISION = 15;
+        const ONE_THIRD = 1/3;
 
+        /**
+         * R Type 8 Quantile Calculation (h = p * (n + 1/3) + 1/3)
+         * This uses the correct R Type 8 formula for quantile estimation.
+         */
         function quantileType8(data, p) {
             const n = data.length;
             if (n === 0) return NaN;
             
-            // k = p * (n - 1) + 1 (1-based index)
-            const k = p * (n - 1) + 1;
+            // h = p * (n + 1/3) + 1/3
+            const h = p * (n + ONE_THIRD) + ONE_THIRD;
             
-            const i = Math.floor(k);
-            const f = k - i;
+            const i = Math.floor(h); // Index (1-based)
+            const g = h - i;       // Fractional part for interpolation (f in old code)
 
-            if (i < 1) return data[0];
-            if (i >= n) return data[n - 1];
+            // 0-based index correction
+            const index_i = i - 1; // Corresponds to x_i
 
-            const x_i = data[i - 1];
-            const x_i_plus_1 = data[i];
+            // Edge cases for small/large p
+            if (h <= 1) return data[0]; // If h is small (e.g., h < 1)
+            if (i >= n) return data[n - 1]; // If h >= n
 
-            return x_i + f * (x_i_plus_1 - x_i);
+            // Linear interpolation: Qp = (1 - g) * x_i + g * x_i+1
+            // In 0-based indices: (1 - g) * data[i-1] + g * data[i]
+            const x_i = data[index_i];
+            const x_i_plus_1 = data[index_i + 1];
+
+            // Use the simplified form: x_i + g * (x_i_plus_1 - x_i)
+            return x_i + g * (x_i_plus_1 - x_i);
         }
 
+        /**
+         * Cleans the raw input string and converts it to a sorted array of numbers.
+         */
         function parseInput(input) {
             const cleaned = input.replace(/[,;\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
             if (!cleaned) return [];
 
-            const numbers = cleaned.split(' ')
-                                   .map(Number)
-                                   .filter(n => isFinite(n));
-
+            const numbers = cleaned.split(' ').map(Number).filter(n => isFinite(n));
             return numbers.sort((a, b) => a - b);
         }
 
+        /**
+         * Formats a number to max 15 decimal places, trimming trailing zeros.
+         * This ensures calculated floats are shown accurately and input integers are shown cleanly.
+         */
         function formatNumber(num) {
             let s = num.toFixed(PRECISION);
-            s = s.replace(/0+$/, ''); // Trim trailing zeros
-            s = s.replace(/\.$/, ''); // Trim trailing decimal point
+            // 1. Remove trailing zeros
+            s = s.replace(/0+$/, ''); 
+            // 2. Remove trailing decimal point if it exists (e.g., "100." becomes "100")
+            s = s.replace(/\.$/, '');
             return s;
         }
 
+        /**
+         * Applies the user-defined outlier adjustment rules for a given set of outliers.
+         * @param {number[]} originalOutliers - The array of outliers for one side (sorted ascendingly).
+         * @param {number} fence - The Upper or Lower Fence value.
+         * @param {number} quartile - The Q3 or Q1 value.
+         * @param {boolean} isUpper - True if adjusting outliers > UF, False for < LF.
+         * @returns {Object<number, number>} Map of {originalValue: adjustedValue}.
+         */
+        function adjustOutliers(originalOutliers, fence, quartile, isUpper) {
+            const N = originalOutliers.length;
+            if (N === 0) return {};
+            
+            const adjustedValues = {};
+            const Distance = Math.abs(fence - quartile); // D = 1.5 * IQR
 
+            // 1. Handle the most extreme outlier (Rule: adjusts exactly to the fence)
+            const mostExtremeOutlier = isUpper ? originalOutliers[N - 1] : originalOutliers[0];
+            adjustedValues[mostExtremeOutlier] = fence;
+
+            // 2. Handle the remaining N-1 outliers (Rule: proportional distribution)
+            // The loop runs k from 1 up to N-1 (total N-1 remaining outliers)
+            for (let k = 1; k < N; k++) {
+                // When isUpper is true, originalOutliers[k-1] is the k-th smallest outlier, which maps to P_k
+                // When isUpper is false, originalOutliers[k] is the (k+1)-th smallest outlier, which maps to P_k
+                
+                let originalValue;
+                let adjustedValue;
+                const factor = k; // k is the proportional factor (1/N, 2/N, 3/N, ...)
+
+                if (isUpper) {
+                    // For upper outliers, the lowest outlier (index 0) gets the first partition (1/N), 
+                    // and the highest (index N-1) gets the fence.
+                    // Loop starts at k=1, so we look at originalOutliers[k-1]
+                    originalValue = originalOutliers[k - 1]; 
+                    adjustedValue = quartile + (factor / N) * Distance;
+                } else {
+                    // For lower outliers, the lowest outlier (index 0) gets the fence,
+                    // and the second lowest (index 1) gets the first partition (1/N).
+                    // Loop starts at k=1, so we look at originalOutliers[k]
+                    originalValue = originalOutliers[k];
+                    adjustedValue = fence + (factor / N) * Distance;
+                }
+
+                adjustedValues[originalValue] = adjustedValue;
+            }
+            
+            return adjustedValues;
+        }
+
+        /**
+         * Main function to calculate, identify, and adjust outliers.
+         */
         function calculateOutliers() {
             const inputElement = document.getElementById('dataInput');
             const resultsElement = document.getElementById('resultsDisplay');
+            const adjustmentElement = document.getElementById('adjustmentDisplay');
             const rawInput = inputElement.value;
             
-            const sortedData = parseInput(rawInput);
+            // 1. Parse and sort data
+            const originalData = parseInput(rawInput);
+            const sortedData = [...originalData].sort((a, b) => a - b);
 
             if (sortedData.length < 4) {
-                resultsElement.innerHTML = `
-                    <p class="text-outlier-red font-semibold">Error: Need at least 4 data points to calculate quartiles (n=${sortedData.length}).</p>
-                `;
+                resultsElement.innerHTML = `<p class="text-outlier-red font-semibold">Error: Need at least 4 data points to calculate quartiles (n=${sortedData.length}).</p>`;
+                adjustmentElement.innerHTML = `<p class="text-gray-500 italic">Cannot adjust data due to insufficient data points.</p>`;
                 return;
             }
 
+            // 2. Calculate Stats using R Type 8
             const Q1 = quantileType8(sortedData, 0.25);
             const Q3 = quantileType8(sortedData, 0.75);
             const IQR_value = Q3 - Q1;
             const k_value = 1.5;
             const lowerFence = Q1 - (k_value * IQR_value);
             const upperFence = Q3 + (k_value * IQR_value);
-            const outliers = sortedData.filter(n => n < lowerFence || n > upperFence);
+
+            // 3. Identify Outliers
+            const upperOutliers = sortedData.filter(n => n > upperFence);
+            const lowerOutliers = sortedData.filter(n => n < lowerFence);
+            const allOutliers = [...lowerOutliers, ...upperOutliers];
+
+            // 4. Apply Adjustment Rules and generate the Map
+            const adjustedMap = {};
             
-            const outlierListHtml = outliers.length > 0
+            if (lowerOutliers.length > 0) {
+                // Must ensure lowerOutliers is sorted lowest to highest (it already is)
+                const map = adjustOutliers(lowerOutliers, lowerFence, Q1, false);
+                Object.assign(adjustedMap, map);
+            }
+
+            if (upperOutliers.length > 0) {
+                // Must ensure upperOutliers is sorted lowest to highest (it already is)
+                const map = adjustOutliers(upperOutliers, upperFence, Q3, true);
+                Object.assign(adjustedMap, map);
+            }
+            
+            // 5. Generate Adjusted Lists for Display (Original -> Adjusted)
+            const adjustedLowerList = lowerOutliers.map(o => ({
+                original: o,
+                adjusted: adjustedMap[o]
+            }));
+
+            const adjustedUpperList = upperOutliers.map(o => ({
+                original: o,
+                adjusted: adjustedMap[o]
+            }));
+
+
+            // 6. Generate Display HTML (Outlier Detection)
+            const outlierListHtml = allOutliers.length > 0
                 ? `<div class="code-output p-3 rounded-lg overflow-x-auto text-sm">
-                       <span class="font-mono">${outliers.map(formatNumber).join(', ')}</span>
+                       <span class="font-mono">${allOutliers.map(formatNumber).join(', ')}</span>
                    </div>`
                 : `<p class="text-interquartile font-semibold">No outliers found outside the 1.5 &times; IQR range.</p>`;
 
             resultsElement.innerHTML = `
                 <div class="space-y-3">
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <p class="font-bold text-lg text-gray-800 mb-2">Summary Statistics (Type 8 Quantile)</p>
+                        <p class="font-bold text-lg text-gray-800 mb-2">Summary Statistics (R Type 8 Quantile)</p>
                         <div class="flex flex-wrap gap-4 text-sm">
                             <span class="font-mono bg-gemini-light text-gemini-blue px-2 py-1 rounded">Q1: ${formatNumber(Q1)}</span>
                             <span class="font-mono bg-gemini-light text-interquartile px-2 py-1 rounded">IQR: ${formatNumber(IQR_value)}</span>
@@ -166,11 +331,60 @@
                     </div>
 
                     <div>
-                        <p class="font-bold text-xl text-outlier-red mb-2">Total Outliers Detected (${outliers.length} found):</p>
+                        <p class="font-bold text-xl text-outlier-red mb-2">Total Outliers Detected (${allOutliers.length} found):</p>
                         ${outlierListHtml}
                     </div>
                 </div>
             `;
+            
+            // 7. Generate Display HTML (Adjustment)
+            
+            const lowerListHtml = adjustedLowerList.length > 0
+                ? `<ul class="space-y-2 text-sm adjusted-list">
+                       ${adjustedLowerList.map(item => `
+                           <li class="font-mono adjusted-item-lower">
+                               ${formatNumber(item.original)} &rarr; <span class="font-bold">${formatNumber(item.adjusted)}</span>
+                           </li>
+                       `).join('')}
+                   </ul>`
+                : `<p class="text-gray-500 text-sm p-4">No outliers found below the Lower Fence.</p>`;
+
+            const upperListHtml = adjustedUpperList.length > 0
+                ? `<ul class="space-y-2 text-sm adjusted-list">
+                       ${adjustedUpperList.map(item => `
+                           <li class="font-mono adjusted-item-upper">
+                               ${formatNumber(item.original)} &rarr; <span class="font-bold">${formatNumber(item.adjusted)}</span>
+                           </li>
+                       `).join('')}
+                   </ul>`
+                : `<p class="text-gray-500 text-sm p-4">No outliers found above the Upper Fence.</p>`;
+
+            let adjustmentMessage = `<p class="text-gray-700 mb-4">The following values were adjusted based on the specified <strong>Q</strong>uartile-to-<strong>F</strong>ence proportional rule:</p>`;
+            if (allOutliers.length === 0) {
+                 adjustmentMessage = `<p class="text-gray-700 mb-4">No outliers were detected, so no values were adjusted.</p>`;
+            }
+
+            adjustmentElement.innerHTML = `
+                ${adjustmentMessage}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-bold text-base text-blue-700 mb-2 whitespace-nowrap">Adjustments Below Lower Fence (${adjustedLowerList.length} items)</h3>
+                        ${lowerListHtml}
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-red-700 mb-2 whitespace-nowrap">Adjustments Above Upper Fence (${adjustedUpperList.length} items)</h3>
+                        ${upperListHtml}
+                    </div>
+                </div>
+            `;
+
+            // Add a quick visual pulse to draw attention to the new results
+            [resultsElement, adjustmentElement].forEach(el => {
+                el.classList.add('card-highlight');
+                setTimeout(() => {
+                    el.classList.remove('card-highlight');
+                }, 500); // Glow for 0.5 seconds
+            });
         }
 
         document.addEventListener('DOMContentLoaded', calculateOutliers);
