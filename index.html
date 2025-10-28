@@ -57,10 +57,13 @@
         
         /* --- Switch Styles (Final) --- */
         .switch {
+            /* Ensures the switch container itself has an absolute size */
             position: relative;
             display: inline-block;
             width: 70px; 
             height: 28px; 
+            /* Added: Prevents flex shrinking/growing of the switch */
+            flex-shrink: 0; 
         }
 
         .switch input {
@@ -190,12 +193,12 @@
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Normalization Type</label>
-                    <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-4 max-w-full">
                         <label class="switch">
                             <input type="checkbox" id="normalizationSwitch" checked>
                             <span class="slider"></span>
                             </label>
-                        <span id="switchLabel" class="text-sm font-semibold text-interquartile">Min-Max Normalization</span>
+                        <span id="switchLabel" class="text-sm font-semibold text-interquartile truncate">Min-Max Normalization (Higher is Better)</span>
                     </div>
                 </div>
                 
