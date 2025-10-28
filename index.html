@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>R Type 8 Outlier Calculator</title>
-    <!-- Load Tailwind CSS for styling -->
+    <title>R Type 8 Outlier Calculator & Normalizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -15,7 +14,8 @@
                         'gemini-light': '#E8F0FE',
                         'interquartile': '#34A853', /* This is the green used for success */
                         'outlier-red': '#EA4335',
-                        'adjustment-purple': '#8E44AD'
+                        'adjustment-purple': '#8E44AD',
+                        'normalization-orange': '#F29900'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -31,9 +31,8 @@
         }
         .card {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transition: box-shadow 0.3s ease-in-out; /* Enable smooth transition for the animation */
+            transition: box-shadow 0.3s ease-in-out;
         }
-        /* Custom class for the pulse/highlight animation effect (Green flash) */
         .card-highlight {
             box-shadow: 0 0 0 4px rgb(52, 211, 153), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
@@ -55,21 +54,142 @@
         .adjusted-item-upper {
             color: #B91C1C;
         }
+        
+        /* --- Switch Styles (Final) --- */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 70px; 
+            height: 28px; 
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #fca5a5; /* Red for Max-Min */
+            transition: .4s;
+            border-radius: 28px; 
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 24px; /* Knob height */
+            width: 30px; /* Knob width */
+            left: 2px; /* Inset from left/bottom */
+            bottom: 2px; 
+            background-color: white;
+            transition: .4s;
+            border-radius: 24px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2); 
+        }
+
+        input:checked + .slider {
+            background-color: #86efac; /* Green for Min-Max */
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(36px); 
+        }
+        
+        /* --- Excel-Friendly Table Styles (Final Compact) --- */
+        #finalTableOutput {
+            cursor: pointer; 
+            border: 2px dashed #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            transition: border-color 0.15s ease-in-out;
+        }
+        #finalTableOutput:hover {
+            border-color: #1A73E8;
+        }
+        
+        #finalTableOutput table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #finalTableOutput th {
+            border: 1px solid #e5e7eb;
+            padding: 6px 3px; /* Reduced padding for compactness */
+            text-align: right;
+            background-color: #eef2ff; 
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 0.75rem; /* Reduced font size for compactness */
+            white-space: nowrap; 
+        }
+        
+        /* Smaller font size for ALL table data cells (td) */
+        #finalTableOutput td {
+            border: 1px solid #e5e7eb;
+            padding: 3px 6px; /* Reduced padding for compactness */
+            text-align: right;
+            font-size: 0.8rem; 
+        }
+
+        #finalTableOutput td:first-child, #finalTableOutput td:nth-child(2) {
+            text-align: right;
+            font-family: monospace;
+        }
+        
+        /* Toast Message Styles */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+        }
+        .toast {
+            background-color: rgba(50, 50, 50, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.5s, transform 0.5s;
+            transform: translateY(20px);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-7xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-extrabold text-gray-800">
-                Outlier Detector & Adjustment: R Type 8 Quantile Method
+            <h1 class="text-4xl font-extrabold text-blue-700">
+                CIMI Ranking Optimizer (Type 8 Quantile)
             </h1>
-            <!-- The descriptive sentence has been removed -->
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Input Card (Col 1) -->
             <div class="bg-white p-6 rounded-xl card lg:col-span-1">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4">1. Input Your Data</h2>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Input Data & Settings</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Normalization Type</label>
+                    <div class="flex items-center space-x-4">
+                        <label class="switch">
+                            <input type="checkbox" id="normalizationSwitch" checked>
+                            <span class="slider"></span>
+                            </label>
+                        <span id="switchLabel" class="text-sm font-semibold text-interquartile">Min-Max Normalization</span>
+                    </div>
+                </div>
+                
                 <textarea 
                     id="dataInput" 
                     rows="10" 
@@ -79,162 +199,151 @@
                 
                 <button 
                     id="calculateBtn" 
-                    onclick="calculateOutliers()"
+                    onclick="calculateOutliersAndNormalize()"
                     class="mt-4 w-full bg-gemini-blue text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition duration-150 text-lg"
                 >
-                    Calculate & Adjust
+                    Process All Steps
                 </button>
             </div>
 
-            <!-- Results Card (Col 2 & 3) -->
             <div class="lg:col-span-2 space-y-8">
-                <div id="resultsDisplay" class="bg-white p-6 rounded-xl card">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Summary & Detected Outliers</h2>
-                    <p class="text-gray-500 italic">Press 'Calculate & Adjust' to see the results.</p>
+                
+                <div id="finalTableCard" class="bg-white p-6 rounded-xl card">
+                    <h2 class="text-2xl font-semibold text-normalization-orange mb-4"> Final Normalized and Ranked Data</h2>
+                    <div id="finalTableOutput">
+                        <p class="text-gray-500 italic">The final table will appear here.</p>
+                    </div>
                 </div>
 
-                <!-- Adjustment Result Card -->
+                <div id="resultsDisplay" class="bg-white p-6 rounded-xl card">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. Summary & Detected Outliers</h2>
+                    <p class="text-gray-500 italic">Press 'Process All Steps' to see the results.</p>
+                </div>
+
                 <div id="adjustmentDisplay" class="bg-white p-6 rounded-xl card">
                     <h2 class="text-2xl font-semibold text-adjustment-purple mb-4">3. Outlier Adjusted Values</h2>
                     <p class="text-gray-500 italic">The adjusted values will appear here.</p>
                 </div>
             </div>
         </div>
-
-        <!-- New Section: R Type 8 Explanation -->
+        
         <section class="mt-12 p-6 bg-white rounded-xl card">
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">R Type 8 Quantile Definition (Hyndman and Fan, 1996)</h2>
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">Explanations of Methods</h2>
             
-            <h3 class="text-xl font-medium text-gray-700 mb-2">Formula for Index <span class="font-mono text-gemini-blue">h</span></h3>
+              <h3 class="text-xl font-medium text-gray-700 mb-2">Formula for Index <span class="font-mono text-gemini-blue">h</span></h3>
             <div class="bg-gray-100 p-4 rounded-lg font-mono text-lg text-center">
                 <span class="font-mono font-bold text-gemini-blue">h</span> = p &times; (<span class="font-mono font-bold text-gemini-blue">n</span> + 1/3) + 1/3
             </div>
 
-            <p class="text-sm text-gray-500 mt-2">
+            <p class="text-sm text-gray-600 mt-2">
                 Where:
-                <ul class="list-disc list-inside ml-4 mt-2 text-gray-600 space-y-1 text-base">
+                <ul class="list-disc list-inside ml-4 mt-2 text-gray-600 space-y-1 text-sm">
                     <li><strong class="font-mono">p</strong> is the probability (e.g., 0.25 for Q1, 0.75 for Q3).</li>
                     <li><strong class="font-mono">n</strong> is the number of data points.</li>
                     <li><strong class="font-mono text-gray-800">h</strong> is the continuous index. The quantile is found by interpolating between the value at index <code class="font-mono text-blue-600">i = floor(h)</code> and the value at index <code class="font-mono text-blue-600">i+1</code>, using the fractional part <code class="font-mono text-blue-600">g = h - i</code>.</li>
                 </ul>
             </p>
             
-            <p class="text-gray-600 mt-4">
+            <p class="text-sm text-gray-600 mt-2">
                 This type is recommended for median unbiased estimation when the distribution is heavy-tailed.
             </p>
+                
+            <h3 class="text-xl font-medium text-gray-700 mb-2 mt-6">Min-Max Normalization (Scaling)</h3>
+            <div class="bg-gray-100 p-4 rounded-lg font-mono text-lg text-center">
+                Score = (Value - Min) / (Max - Min)
+            </div>
+            <p class="text-sm text-gray-600 mt-2">
+                This is the standard normalization method, scaling all adjusted data points to a range between 0 and 1. Higher values in the original data result in higher normalized scores (i.e., higher is better).
+            </p>
 
-            <h3 class="text-xl font-medium text-gray-700 mb-2 mt-6">Citation</h3>
-            <p class="text-sm text-gray-500">
-                Hyndman, R. J., & Fan, Y. (1996). Sample quantiles in statistical packages. <span class="italic">The American Statistician, 50(4)</span>, 361-365. 
+            <h3 class="text-xl font-medium text-gray-700 mb-2 mt-6">Max-Min Normalization (Inverse Scaling)</h3>
+            <div class="bg-gray-100 p-4 rounded-lg font-mono text-lg text-center">
+                Score = (Value - Max) / (Min - Max)
+            </div>
+            <p class="text-sm text-gray-600 mt-2">
+                This variation is functionally equivalent to the standard Min-Max but is structured to invert the scaling effect. It's often used when lower values in the original data should result in higher normalized scores (i.e., lower is better), such as when scoring expenses or error rates.
+            </p>
+        </section>
+        
+        <section class="mt-8 p-6 bg-white rounded-xl card">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Citation</h3>
+            <p class="text-sm text-gray-600">
+                Hyndman, R. J., & Fan, Y. (1996). Sample quantiles in statistical packages. <span style="font-style: italic;">The American Statistician, 50</span>(4), 361-365.  
                 <a href="https://doi.org/10.1080/00031305.1996.10473566" class="text-gemini-blue hover:underline" target="_blank">https://doi.org/10.1080/00031305.1996.10473566</a>
             </p>
         </section>
 
-        <!-- Footer with Last Edited Time -->
         <footer class="mt-8 text-center text-sm text-gray-500">
-            Last Updated: October 27, 2025
+            First Created: October 27, 2025 | Last Updated: October 28, 2025
         </footer>
 
     </div>
+    
+    <div id="toast-container"></div>
 
     <script>
         const PRECISION = 15;
         const ONE_THIRD = 1/3;
 
-        /**
-         * R Type 8 Quantile Calculation (h = p * (n + 1/3) + 1/3)
-         * This uses the correct R Type 8 formula for quantile estimation.
-         */
+        // --- Core R Type 8 Quantile Functions ---
         function quantileType8(data, p) {
             const n = data.length;
             if (n === 0) return NaN;
             
-            // h = p * (n + 1/3) + 1/3
             const h = p * (n + ONE_THIRD) + ONE_THIRD;
             
-            const i = Math.floor(h); // Index (1-based)
-            const g = h - i;       // Fractional part for interpolation (f in old code)
+            const i = Math.floor(h); 
+            const g = h - i;       
 
-            // 0-based index correction
-            const index_i = i - 1; // Corresponds to x_i
+            const index_i = i - 1; 
 
-            // Edge cases for small/large p
-            if (h <= 1) return data[0]; // If h is small (e.g., h < 1)
-            if (i >= n) return data[n - 1]; // If h >= n
+            if (h <= 1) return data[0]; 
+            if (i >= n) return data[n - 1]; 
 
-            // Linear interpolation: Qp = (1 - g) * x_i + g * x_i+1
-            // In 0-based indices: (1 - g) * data[i-1] + g * data[i]
             const x_i = data[index_i];
             const x_i_plus_1 = data[index_i + 1];
 
-            // Use the simplified form: x_i + g * (x_i_plus_1 - x_i)
             return x_i + g * (x_i_plus_1 - x_i);
         }
 
-        /**
-         * Cleans the raw input string and converts it to a sorted array of numbers.
-         */
         function parseInput(input) {
             const cleaned = input.replace(/[,;\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
             if (!cleaned) return [];
 
             const numbers = cleaned.split(' ').map(Number).filter(n => isFinite(n));
-            return numbers.sort((a, b) => a - b);
+            return numbers.filter(n => !isNaN(n)); 
         }
 
-        /**
-         * Formats a number to max 15 decimal places, trimming trailing zeros.
-         * This ensures calculated floats are shown accurately and input integers are shown cleanly.
-         */
         function formatNumber(num) {
             let s = num.toFixed(PRECISION);
-            // 1. Remove trailing zeros
             s = s.replace(/0+$/, ''); 
-            // 2. Remove trailing decimal point if it exists (e.g., "100." becomes "100")
             s = s.replace(/\.$/, '');
             return s;
         }
-
-        /**
-         * Applies the user-defined outlier adjustment rules for a given set of outliers.
-         * @param {number[]} originalOutliers - The array of outliers for one side (sorted ascendingly).
-         * @param {number} fence - The Upper or Lower Fence value.
-         * @param {number} quartile - The Q3 or Q1 value.
-         * @param {boolean} isUpper - True if adjusting outliers > UF, False for < LF.
-         * @returns {Object<number, number>} Map of {originalValue: adjustedValue}.
-         */
+        
+        // --- Outlier Adjustment Logic ---
         function adjustOutliers(originalOutliers, fence, quartile, isUpper) {
             const N = originalOutliers.length;
             if (N === 0) return {};
             
             const adjustedValues = {};
-            const Distance = Math.abs(fence - quartile); // D = 1.5 * IQR
+            const Distance = Math.abs(fence - quartile);
 
-            // 1. Handle the most extreme outlier (Rule: adjusts exactly to the fence)
+            // The most extreme outlier adjusts exactly to the fence
             const mostExtremeOutlier = isUpper ? originalOutliers[N - 1] : originalOutliers[0];
             adjustedValues[mostExtremeOutlier] = fence;
 
-            // 2. Handle the remaining N-1 outliers (Rule: proportional distribution)
-            // The loop runs k from 1 up to N-1 (total N-1 remaining outliers)
+            // The remaining N-1 outliers are proportionally distributed
             for (let k = 1; k < N; k++) {
-                // When isUpper is true, originalOutliers[k-1] is the k-th smallest outlier, which maps to P_k
-                // When isUpper is false, originalOutliers[k] is the (k+1)-th smallest outlier, which maps to P_k
-                
                 let originalValue;
                 let adjustedValue;
-                const factor = k; // k is the proportional factor (1/N, 2/N, 3/N, ...)
+                const factor = k; 
 
                 if (isUpper) {
-                    // For upper outliers, the lowest outlier (index 0) gets the first partition (1/N), 
-                    // and the highest (index N-1) gets the fence.
-                    // Loop starts at k=1, so we look at originalOutliers[k-1]
                     originalValue = originalOutliers[k - 1]; 
                     adjustedValue = quartile + (factor / N) * Distance;
                 } else {
-                    // For lower outliers, the lowest outlier (index 0) gets the fence,
-                    // and the second lowest (index 1) gets the first partition (1/N).
-                    // Loop starts at k=1, so we look at originalOutliers[k]
-                    originalValue = originalOutliers[k];
+                    originalValue = originalOutliers[k]; 
                     adjustedValue = fence + (factor / N) * Distance;
                 }
 
@@ -244,26 +353,113 @@
             return adjustedValues;
         }
 
-        /**
-         * Main function to calculate, identify, and adjust outliers.
-         */
-        function calculateOutliers() {
+        // --- Normalization Function ---
+        function normalize(value, min, max, isMinMax) {
+            if (min === max) {
+                return 0.5;
+            }
+            
+            if (isMinMax) {
+                return (value - min) / (max - min);
+            } else {
+                return (value - max) / (min - max);
+            }
+        }
+        
+        // --- Toast Notification Function ---
+        function showToast(message, duration = 2000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    container.removeChild(toast);
+                }, { once: true });
+            }, duration);
+        }
+
+        // --- Utility for Copying Table to Clipboard (FIXED: No extra trailing newline) ---
+        function copyTableToClipboard(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            const table = document.querySelector('#finalTableOutput table');
+            if (!table) return;
+
+            const excelRows = []; // Use an array to manage newlines correctly
+
+            // Get Rows (ONLY the tbody content, skipping the headers)
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                // Map innerText to get the data, join by tab for Excel/Sheets
+                const rowData = Array.from(cells).map(td => td.innerText).join('\t');
+                excelRows.push(rowData); // Push the row data string
+            });
+            
+            // Join the array elements with a newline character, which ensures 
+            // no trailing newline is added after the last row.
+            const excelData = excelRows.join('\n'); 
+
+            // Robust Copy Mechanism (using a temporary textarea)
+            const tempTextarea = document.createElement('textarea');
+            tempTextarea.value = excelData;
+            document.body.appendChild(tempTextarea);
+            tempTextarea.select();
+            
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.error('Copy attempt failed:', err);
+            }
+            
+            document.body.removeChild(tempTextarea);
+
+            if (success) {
+                showToast('✅ Full table data (all 4 columns) copied to clipboard! Paste into Excel/Sheets.');
+            } else {
+                navigator.clipboard.writeText(excelData).then(() => {
+                     showToast('✅ Full table data copied to clipboard (Clipboard API Fallback).');
+                }).catch(err => {
+                    console.error('Final fallback failed:', err);
+                    showToast('❌ Copy failed. Please try manual copy.');
+                });
+            }
+        }
+        
+        // --- Combined Main Function ---
+        function calculateOutliersAndNormalize() {
             const inputElement = document.getElementById('dataInput');
             const resultsElement = document.getElementById('resultsDisplay');
             const adjustmentElement = document.getElementById('adjustmentDisplay');
+            const finalTableElement = document.getElementById('finalTableOutput');
+            const normalizationSwitch = document.getElementById('normalizationSwitch');
+            const isMinMax = normalizationSwitch.checked;
+            
             const rawInput = inputElement.value;
             
-            // 1. Parse and sort data
+            // 1. Parse Data
             const originalData = parseInput(rawInput);
-            const sortedData = [...originalData].sort((a, b) => a - b);
-
-            if (sortedData.length < 4) {
-                resultsElement.innerHTML = `<p class="text-outlier-red font-semibold">Error: Need at least 4 data points to calculate quartiles (n=${sortedData.length}).</p>`;
-                adjustmentElement.innerHTML = `<p class="text-gray-500 italic">Cannot adjust data due to insufficient data points.</p>`;
+            if (originalData.length < 4) {
+                resultsElement.innerHTML = `<p class="text-outlier-red font-semibold">Error: Need at least 4 data points (n=${originalData.length}).</p>`;
+                adjustmentElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient data.</p>`;
+                finalTableElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient data.</p>`;
                 return;
             }
+            // Need sorted data for quantile calculation
+            const sortedData = [...originalData].sort((a, b) => a - b);
 
-            // 2. Calculate Stats using R Type 8
+            // 2. Calculate Outliers and Adjustment Map
             const Q1 = quantileType8(sortedData, 0.25);
             const Q3 = quantileType8(sortedData, 0.75);
             const IQR_value = Q3 - Q1;
@@ -271,39 +467,53 @@
             const lowerFence = Q1 - (k_value * IQR_value);
             const upperFence = Q3 + (k_value * IQR_value);
 
-            // 3. Identify Outliers
             const upperOutliers = sortedData.filter(n => n > upperFence);
             const lowerOutliers = sortedData.filter(n => n < lowerFence);
             const allOutliers = [...lowerOutliers, ...upperOutliers];
-
-            // 4. Apply Adjustment Rules and generate the Map
+            
             const adjustedMap = {};
-            
             if (lowerOutliers.length > 0) {
-                // Must ensure lowerOutliers is sorted lowest to highest (it already is)
-                const map = adjustOutliers(lowerOutliers, lowerFence, Q1, false);
-                Object.assign(adjustedMap, map);
+                Object.assign(adjustedMap, adjustOutliers(lowerOutliers, lowerFence, Q1, false));
+            }
+            if (upperOutliers.length > 0) {
+                Object.assign(adjustedMap, adjustOutliers(upperOutliers, upperFence, Q3, true));
             }
 
-            if (upperOutliers.length > 0) {
-                // Must ensure upperOutliers is sorted lowest to highest (it already is)
-                const map = adjustOutliers(upperOutliers, upperFence, Q3, true);
-                Object.assign(adjustedMap, map);
+            // 3. Generate Adjusted Data List (for ALL data points)
+            const adjustedData = originalData.map(val => adjustedMap[val] !== undefined ? adjustedMap[val] : val);
+            
+            // 4. Calculate Min/Max of the Adjusted Data
+            const minAdjusted = adjustedData.length > 0 ? Math.min(...adjustedData) : 0;
+            const maxAdjusted = adjustedData.length > 0 ? Math.max(...adjustedData) : 0;
+            
+            // 5. Normalize and create the final structured data (ALL data points)
+            const finalData = adjustedData.map((adjustedVal, index) => {
+                const normalizedScore = normalize(adjustedVal, minAdjusted, maxAdjusted, isMinMax);
+                return {
+                    original: originalData[index],
+                    adjusted: adjustedVal,
+                    normalized: normalizedScore
+                };
+            });
+
+            // 6. Calculate Rank (Ranking is applied to ALL data points)
+            const rankedData = [...finalData].sort((a, b) => b.normalized - a.normalized);
+
+            let currentRank = 1;
+            for (let i = 0; i < rankedData.length; i++) {
+                if (i > 0 && rankedData[i].normalized < rankedData[i-1].normalized) {
+                    currentRank = i + 1;
+                }
+                finalData.filter(item => item.normalized === rankedData[i].normalized)
+                        .forEach(item => {
+                            if (item.rank === undefined) { 
+                                item.rank = currentRank;
+                            }
+                        });
             }
             
-            // 5. Generate Adjusted Lists for Display (Original -> Adjusted)
-            const adjustedLowerList = lowerOutliers.map(o => ({
-                original: o,
-                adjusted: adjustedMap[o]
-            }));
-
-            const adjustedUpperList = upperOutliers.map(o => ({
-                original: o,
-                adjusted: adjustedMap[o]
-            }));
-
-
-            // 6. Generate Display HTML (Outlier Detection)
+            // --- Step 7: Generate Display HTML for Outlier & Adjustment (Section 2 & 3) ---
+            
             const outlierListHtml = allOutliers.length > 0
                 ? `<div class="code-output p-3 rounded-lg overflow-x-auto text-sm">
                        <span class="font-mono">${allOutliers.map(formatNumber).join(', ')}</span>
@@ -337,8 +547,9 @@
                 </div>
             `;
             
-            // 7. Generate Display HTML (Adjustment)
-            
+            const adjustedLowerList = lowerOutliers.map(o => ({ original: o, adjusted: adjustedMap[o] }));
+            const adjustedUpperList = upperOutliers.map(o => ({ original: o, adjusted: adjustedMap[o] }));
+
             const lowerListHtml = adjustedLowerList.length > 0
                 ? `<ul class="space-y-2 text-sm adjusted-list">
                        ${adjustedLowerList.map(item => `
@@ -359,7 +570,7 @@
                    </ul>`
                 : `<p class="text-gray-500 text-sm p-4">No outliers found above the Upper Fence.</p>`;
 
-            let adjustmentMessage = `<p class="text-gray-700 mb-4">The following values were adjusted based on the specified <strong>Q</strong>uartile-to-<strong>F</strong>ence proportional rule:</p>`;
+            let adjustmentMessage = `<p class="text-gray-700 mb-4">The following values were adjusted based on the specified Quartile-to-Fence proportional rule:</p>`;
             if (allOutliers.length === 0) {
                  adjustmentMessage = `<p class="text-gray-700 mb-4">No outliers were detected, so no values were adjusted.</p>`;
             }
@@ -378,16 +589,92 @@
                 </div>
             `;
 
+
+            // --- Step 8: Generate Final Table HTML (Section 1) ---
+            const normalizationName = isMinMax ? 'Min-Max' : 'Max-Min';
+            
+            // Generate rows for ALL data points, but only show the original value if it was an outlier
+            const tableRows = finalData.map(item => {
+                const isOutlier = adjustedMap[item.original] !== undefined;
+                // Only show the original value if it was detected as an outlier. Otherwise, leave the cell blank.
+                const originalValueCell = isOutlier ? formatNumber(item.original) : '';
+
+                return `
+                    <tr>
+                        <td ${isOutlier ? 'class="font-bold text-outlier-red"' : ''}>${originalValueCell}</td>
+                        <td ${isOutlier ? 'class="font-bold text-adjustment-purple"' : ''}>${formatNumber(item.adjusted)}</td>
+                        <td>${formatNumber(item.normalized)}</td>
+                        <td>${item.rank}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Temporarily disable the event handler to prevent duplicates during update
+            const finalTableCard = document.getElementById('finalTableOutput');
+            finalTableCard.removeEventListener('click', copyTableToClipboard);
+            
+            finalTableCard.innerHTML = `
+                <div class="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 text-blue-800 font-semibold">
+                    💡 <span class="underline">Click anywhere in this box</span> to automatically copy the <strong class="text-red-600">full table data</strong> (Excel-friendly format).
+                </div>
+                <div class="mb-4 flex items-center justify-start">
+                    <p class="text-sm text-gray-700">Normalization Method Used: <strong class="text-normalization-orange">${normalizationName}</strong>. Min/Max of adjusted data used for scaling.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Outlier Value Only</th>
+                                <th>Adjusted Value (Outliers Replaced)</th>
+                                <th>${normalizationName} Normalized Score (0 to 1)</th>
+                                <th>Rank (Highest Score = 1)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            // Re-enable the event handler after the innerHTML is set
+            finalTableCard.addEventListener('click', copyTableToClipboard);
+
+
             // Add a quick visual pulse to draw attention to the new results
-            [resultsElement, adjustmentElement].forEach(el => {
+            [document.getElementById('finalTableCard'), resultsElement, adjustmentElement].forEach(el => {
                 el.classList.add('card-highlight');
                 setTimeout(() => {
                     el.classList.remove('card-highlight');
-                }, 500); // Glow for 0.5 seconds
+                }, 500);
             });
         }
-
-        document.addEventListener('DOMContentLoaded', calculateOutliers);
+        
+        // --- Switch/Label Handler ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const normalizationSwitch = document.getElementById('normalizationSwitch');
+            const switchLabel = document.getElementById('switchLabel');
+            
+            function updateSwitchLabel() {
+                if (normalizationSwitch.checked) {
+                    switchLabel.textContent = 'Min-Max Normalization (Higher is Better)';
+                    switchLabel.classList.remove('text-outlier-red');
+                    switchLabel.classList.add('text-interquartile');
+                } else {
+                    switchLabel.textContent = 'Max-Min Normalization (Lower is Better)';
+                    switchLabel.classList.remove('text-interquartile');
+                    switchLabel.classList.add('text-outlier-red');
+                }
+                // Call the main function to re-calculate and re-render the table
+                calculateOutliersAndNormalize();
+            }
+            
+            updateSwitchLabel();
+            normalizationSwitch.addEventListener('change', updateSwitchLabel);
+            
+            // Also call the main function on initial load
+            calculateOutliersAndNormalize();
+        });
     </script>
 </body>
 </html>
