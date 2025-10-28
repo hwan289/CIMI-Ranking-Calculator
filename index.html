@@ -187,7 +187,7 @@
             </h1>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:col-cols-3 gap-8">
             <div class="bg-white p-6 rounded-xl card lg:col-span-1">
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4">Input Data & Settings</h2>
                 
@@ -207,7 +207,7 @@
                     rows="5" 
                     placeholder="Enter your numbers here, separated by spaces, commas, or newlines. E.g., 88, 92, 95, 105, 5, 208"
                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-gemini-blue focus:ring-gemini-blue transition duration-150"
-                >88, 92, 95, 98, 101, 105, 107, 109, 110, NA, 5, 200, 208, 215, 220, 1</textarea>
+                >88, 92, 95, 98, 101, 105, 107, 109, 110, NA, 5, 200, 208, 215, 220, 1, 8.8</textarea>
                 
                 <div class="flex space-x-4 mt-4"> <button 
                         id="calculateBtn" 
@@ -343,6 +343,9 @@
             });
         }
 
+        /**
+         * Formats calculated values (quantiles, adjusted scores, normalized scores) to high precision.
+         */
         function formatNumber(num) {
             // Check if the input is a valid number before formatting
             if (typeof num !== 'number' || !isFinite(num)) {
@@ -351,6 +354,36 @@
             let s = num.toFixed(PRECISION);
             s = s.replace(/0+$/, ''); 
             s = s.replace(/\.$/, '');
+            return s;
+        }
+
+        /**
+         * MODIFIED: Formats non-outlier, non-calculated values (user inputs) to a cleaner, lower precision
+         * to avoid messy floating point artifacts, while preserving all significant digits.
+         */
+        function simpleFormatNumber(num) {
+             if (typeof num !== 'number' || !isFinite(num)) {
+                return '';
+            }
+            // Use toPrecision(15) to show all significant digits of the input 
+            // without fixed-point trailing zeros. This accurately reflects the input value 
+            // without excessive padding or forced rounding like fixed-point methods.
+            let s = num.toPrecision(PRECISION);
+            
+            // Further cleaning to remove scientific notation if possible and ensure standard form
+            if (s.includes('e')) {
+                 // Fallback to Number constructor to expand scientific notation
+                 s = Number(s).toString();
+            }
+            
+            // Clean up unnecessary trailing zeros after the decimal point
+            s = s.replace(/(\.\d*?)(0+)$/, '$1').replace(/\.$/, '');
+            
+            // Remove any *remaining* trailing zeros after the decimal, and the decimal point if it's the last character
+            // The toPrecision often leaves no trailing zeros, but this is a final cleanup.
+            s = s.replace(/0+$/, ''); 
+            s = s.replace(/\.$/, '');
+            
             return s;
         }
         
@@ -364,6 +397,7 @@
 
             // The most extreme outlier adjusts exactly to the fence
             const mostExtremeOutlier = isUpper ? originalOutliers[N - 1] : originalOutliers[0];
+            // We use the full original value as the key
             adjustedValues[mostExtremeOutlier] = fence;
 
             // The remaining N-1 outliers are proportionally distributed
@@ -379,7 +413,8 @@
                     originalValue = originalOutliers[k]; 
                     adjustedValue = fence + (factor / N) * Distance;
                 }
-
+                
+                // We use the full original value as the key
                 adjustedValues[originalValue] = adjustedValue;
             }
             
@@ -599,6 +634,7 @@
             
             // --- Step 8: Generate Display HTML for Outlier & Adjustment (Section 2 & 3) ---
             
+            // Use high-precision formatting for all calculated/outlier values in the summary
             const outlierListHtml = allOutliers.length > 0
                 ? `<div class="code-output p-3 rounded-lg overflow-x-auto text-sm">
                        <span class="font-mono">${allOutliers.map(formatNumber).join(', ')}</span>
@@ -684,11 +720,24 @@
             const tableRows = finalData.map(item => {
                 const isOutlier = item.isNumeric && item.isOutlier;
                 const originalValueCell = item.isNumeric ? (isOutlier ? formatNumber(item.original) : '') : item.original;
+                
+                // *** THE KEY FIX IS HERE: Conditional formatting for Adjusted Value column ***
+                let adjustedValueDisplay;
+                if (!item.isNumeric) {
+                    adjustedValueDisplay = '';
+                } else if (isOutlier) {
+                    // Use high-precision format for calculated/adjusted outliers
+                    adjustedValueDisplay = formatNumber(item.adjusted); 
+                } else {
+                    // Use simple format for non-outlier inputs to keep them clean
+                    adjustedValueDisplay = simpleFormatNumber(item.original); 
+                }
+
 
                 return `
                     <tr>
                         <td ${isOutlier ? 'class="font-bold text-outlier-red"' : ''}>${originalValueCell}</td>
-                        <td ${isOutlier ? 'class="font-bold text-adjustment-purple"' : ''}>${formatNumber(item.adjusted)}</td>
+                        <td ${isOutlier ? 'class="font-bold text-adjustment-purple"' : ''}>${adjustedValueDisplay}</td>
                         <td>${formatNumber(item.normalized)}</td>
                         <td>${item.rank || ''}</td>
                     </tr>
