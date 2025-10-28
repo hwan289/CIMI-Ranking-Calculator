@@ -117,16 +117,18 @@
         #finalTableOutput table {
             width: 100%;
             border-collapse: collapse;
+            /* REMOVED: overflow-x-auto from HTML, ensuring table wraps/fits */
+            table-layout: fixed; /* Ensures column widths are respected */
         }
         #finalTableOutput th {
             border: 1px solid #e5e7eb;
             padding: 6px 3px; /* Reduced padding for compactness */
-            text-align: right;
+            text-align: center; /* MODIFIED: Center alignment for headers */
             background-color: #eef2ff; 
             font-weight: 600;
             color: #1f2937;
             font-size: 0.75rem; /* Reduced font size for compactness */
-            white-space: nowrap; 
+            white-space: normal; /* Allow text to wrap */
         }
         
         /* Smaller font size for ALL table data cells (td) */
@@ -134,13 +136,20 @@
             border: 1px solid #e5e7eb;
             padding: 3px 6px; /* Reduced padding for compactness */
             text-align: right;
-            font-size: 0.8rem; 
+            font-size: 0.8rem; /* Applied to all columns */
+            overflow: hidden; /* Hide overflow content */
+            text-overflow: ellipsis; /* Use ellipsis for overflowed content */
+            white-space: nowrap; /* Keep content on single line */
+            font-family: monospace; /* MODIFIED: Monospace font applied to ALL data cells */
         }
 
-        #finalTableOutput td:first-child, #finalTableOutput td:nth-child(2) {
-            text-align: right;
-            font-family: monospace;
-        }
+        /* Specific column width adjustments for better fit */
+        /* MODIFIED: Outer two columns wider (23% each), inner two still equal (27% each). (23*2 + 27*2 = 100) */
+        #finalTableOutput thead th:nth-child(1) { width: 23%; } /* Outlier/Non-Numeric (Outer Left) - WIDER */
+        #finalTableOutput thead th:nth-child(2) { width: 27%; } /* Adjusted Value (Inner Left) - EQUAL */
+        #finalTableOutput thead th:nth-child(3) { width: 27%; } /* Normalized Score (Inner Right) - EQUAL */
+        #finalTableOutput thead th:nth-child(4) { width: 23%; } /* Rank (Outer Right) - WIDER */
+        
         
         /* Toast Message Styles */
         #toast-container {
@@ -195,7 +204,7 @@
                     rows="5" 
                     placeholder="Enter your numbers here, separated by spaces, commas, or newlines. E.g., 88, 92, 95, 105, 5, 208"
                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-gemini-blue focus:ring-gemini-blue transition duration-150"
-                >88, 92, 95, 98, 101, 105, 107, 109, 110, 5, 200, 208, 215, 220, 1</textarea>
+                >88, 92, 95, 98, 101, 105, 107, 109, 110, NA, 5, 200, 208, 215, 220, 1</textarea>
                 
                 <div class="flex space-x-4 mt-4"> <button 
                         id="calculateBtn" 
@@ -315,15 +324,27 @@
             return x_i + g * (x_i_plus_1 - x_i);
         }
 
+        // --- MODIFICATION 2: Parse all inputs, keeping non-numeric values as strings ---
         function parseInput(input) {
+            // Replace separators with a single space, then split by space, and filter out empty strings
             const cleaned = input.replace(/[,;\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
             if (!cleaned) return [];
 
-            const numbers = cleaned.split(' ').map(Number).filter(n => isFinite(n));
-            return numbers.filter(n => !isNaN(n)); 
+            const tokens = cleaned.split(' ');
+            
+            // Map tokens to either a number or the original token string
+            return tokens.map(token => {
+                const number = Number(token);
+                // Return the number if it's a valid finite number, otherwise return the original token
+                return isFinite(number) && !isNaN(number) ? number : token;
+            });
         }
 
         function formatNumber(num) {
+            // Check if the input is a valid number before formatting
+            if (typeof num !== 'number' || !isFinite(num)) {
+                return '';
+            }
             let s = num.toFixed(PRECISION);
             s = s.replace(/0+$/, ''); 
             s = s.replace(/\.$/, '');
@@ -404,14 +425,15 @@
             const table = document.querySelector('#finalTableOutput table');
             if (!table) return;
 
-            const excelRows = []; // Use an array to manage newlines correctly
+            const excelRows = []; 
 
             // Get Rows (ONLY the tbody content, skipping the headers)
             const rows = table.querySelectorAll('tbody tr');
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 // Map innerText to get the data, join by tab for Excel/Sheets
-                const rowData = Array.from(cells).map(td => td.innerText).join('\t');
+                // Ensure to handle potential empty cells correctly (e.g., non-numeric rows)
+                const rowData = Array.from(cells).map(td => td.innerText || '').join('\t');
                 excelRows.push(rowData); // Push the row data string
             });
             
@@ -475,16 +497,22 @@
             
             const rawInput = inputElement.value;
             
-            // 1. Parse Data
-            const originalData = parseInput(rawInput);
-            if (originalData.length < 4) {
-                resultsElement.innerHTML = `<p class="text-outlier-red font-semibold">Error: Need at least 4 data points (n=${originalData.length}).</p>`;
-                adjustmentElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient data.</p>`;
-                finalTableElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient data.</p>`;
+            // 1. Parse Data (retains non-numeric tokens)
+            const mixedInputData = parseInput(rawInput);
+            const totalRows = mixedInputData.length; // MODIFICATION 1: Get total rows (including non-numbers)
+            
+            // Separate valid numbers for statistical calculation
+            const originalNumericData = mixedInputData.filter(val => typeof val === 'number');
+            
+            if (originalNumericData.length < 4) {
+                resultsElement.innerHTML = `<p class="text-outlier-red font-semibold">Error: Need at least 4 valid numeric data points (n=${originalNumericData.length}).</p>`;
+                adjustmentElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient numeric data.</p>`;
+                finalTableElement.innerHTML = `<p class="text-gray-500 italic">Cannot process due to insufficient numeric data.</p>`;
                 return;
             }
+            
             // Need sorted data for quantile calculation
-            const sortedData = [...originalData].sort((a, b) => a - b);
+            const sortedData = [...originalNumericData].sort((a, b) => a - b);
 
             // 2. Calculate Outliers and Adjustment Map
             const Q1 = quantileType8(sortedData, 0.25);
@@ -506,32 +534,32 @@
                 Object.assign(adjustedMap, adjustOutliers(upperOutliers, upperFence, Q3, true));
             }
 
-            // 3. Generate Adjusted Data List (for ALL data points)
-            const adjustedData = originalData.map(val => adjustedMap[val] !== undefined ? adjustedMap[val] : val);
+            // 3. Generate Adjusted Data List (only for numeric data points)
+            const adjustedNumericData = originalNumericData.map(val => adjustedMap[val] !== undefined ? adjustedMap[val] : val);
             
             // 4. Calculate Min/Max of the Adjusted Data
-            const minAdjusted = adjustedData.length > 0 ? Math.min(...adjustedData) : 0;
-            const maxAdjusted = adjustedData.length > 0 ? Math.max(...adjustedData) : 0;
+            const minAdjusted = adjustedNumericData.length > 0 ? Math.min(...adjustedNumericData) : 0;
+            const maxAdjusted = adjustedNumericData.length > 0 ? Math.max(...adjustedNumericData) : 0;
             
-            // 5. Normalize and create the final structured data (ALL data points)
-            const finalData = adjustedData.map((adjustedVal, index) => {
+            // 5. Normalize and create the temporary structured data (only for numeric data points)
+            const tempFinalData = adjustedNumericData.map(adjustedVal => {
                 const normalizedScore = normalize(adjustedVal, minAdjusted, maxAdjusted, isMinMax);
                 return {
-                    original: originalData[index],
                     adjusted: adjustedVal,
-                    normalized: normalizedScore
+                    normalized: normalizedScore,
+                    rank: undefined // Will be set in the next step
                 };
             });
 
-            // 6. Calculate Rank (Ranking is applied to ALL data points)
-            const rankedData = [...finalData].sort((a, b) => b.normalized - a.normalized);
+            // 6. Calculate Rank (Ranking is applied ONLY to numeric data points)
+            const rankedNumericData = [...tempFinalData].sort((a, b) => b.normalized - a.normalized);
 
             let currentRank = 1;
-            for (let i = 0; i < rankedData.length; i++) {
-                if (i > 0 && rankedData[i].normalized < rankedData[i-1].normalized) {
+            for (let i = 0; i < rankedNumericData.length; i++) {
+                if (i > 0 && rankedNumericData[i].normalized < rankedNumericData[i-1].normalized) {
                     currentRank = i + 1;
                 }
-                finalData.filter(item => item.normalized === rankedData[i].normalized)
+                tempFinalData.filter(item => item.normalized === rankedNumericData[i].normalized)
                         .forEach(item => {
                             if (item.rank === undefined) { 
                                 item.rank = currentRank;
@@ -539,16 +567,45 @@
                         });
             }
             
-            // --- Step 7: Generate Display HTML for Outlier & Adjustment (Section 2 & 3) ---
+            // 7. MODIFICATION 2: Construct the final data structure that preserves all rows
+            let numericIndex = 0;
+            const finalData = mixedInputData.map(val => {
+                if (typeof val === 'number') {
+                    const data = tempFinalData[numericIndex];
+                    const originalVal = originalNumericData[numericIndex];
+                    numericIndex++; 
+                    return {
+                        original: originalVal,
+                        isNumeric: true,
+                        adjusted: data.adjusted,
+                        normalized: data.normalized,
+                        rank: data.rank,
+                        isOutlier: adjustedMap[originalVal] !== undefined
+                    };
+                } else {
+                    return {
+                        original: val, // Non-numeric string (e.g., 'NA')
+                        isNumeric: false,
+                        adjusted: '',
+                        normalized: '',
+                        rank: ''
+                    };
+                }
+            });
+
+            
+            // --- Step 8: Generate Display HTML for Outlier & Adjustment (Section 2 & 3) ---
             
             const outlierListHtml = allOutliers.length > 0
                 ? `<div class="code-output p-3 rounded-lg overflow-x-auto text-sm">
                        <span class="font-mono">${allOutliers.map(formatNumber).join(', ')}</span>
                    </div>`
-                : `<p class="text-interquartile font-semibold">No outliers found outside the 1.5 &times; IQR range.</p>`;
+                : `<p class="text-interquartile font-semibold">No outliers found outside the 1.5 &times; IQR range in the valid numeric data.</p>`;
 
             resultsElement.innerHTML = `
                 <div class="space-y-3">
+                    <p class="text-sm text-gray-700">Calculations based on <strong class="text-gemini-blue">${originalNumericData.length}</strong> valid numeric data points.</p>
+                    
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <p class="font-bold text-lg text-gray-800 mb-2">Summary Statistics (Type 8 Quantile)</p>
                         <div class="flex flex-wrap gap-4 text-sm">
@@ -617,21 +674,20 @@
             `;
 
 
-            // --- Step 8: Generate Final Table HTML (Section 1) ---
+            // --- Step 9: Generate Final Table HTML (Section 1) ---
             const normalizationName = isMinMax ? 'Min-Max' : 'Max-Min';
             
-            // Generate rows for ALL data points, but only show the original value if it was an outlier
+            // Generate rows for ALL data points, including non-numeric ones
             const tableRows = finalData.map(item => {
-                const isOutlier = adjustedMap[item.original] !== undefined;
-                // Only show the original value if it was detected as an outlier. Otherwise, leave the cell blank.
-                const originalValueCell = isOutlier ? formatNumber(item.original) : '';
+                const isOutlier = item.isNumeric && item.isOutlier;
+                const originalValueCell = item.isNumeric ? (isOutlier ? formatNumber(item.original) : '') : item.original;
 
                 return `
                     <tr>
                         <td ${isOutlier ? 'class="font-bold text-outlier-red"' : ''}>${originalValueCell}</td>
                         <td ${isOutlier ? 'class="font-bold text-adjustment-purple"' : ''}>${formatNumber(item.adjusted)}</td>
                         <td>${formatNumber(item.normalized)}</td>
-                        <td>${item.rank}</td>
+                        <td>${item.rank || ''}</td>
                     </tr>
                 `;
             }).join('');
@@ -641,20 +697,23 @@
             finalTableCard.removeEventListener('click', copyTableToClipboard);
             
             finalTableCard.innerHTML = `
+                <p class="text-md font-semibold text-gray-700 mb-4">
+                    Total Input Rows Processed: <span class="text-gemini-blue">${totalRows}</span>
+                </p>
+                
                 <div class="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 text-blue-800 font-semibold">
                     💡 <span class="underline">Click anywhere in this box</span> to automatically copy the <strong class="text-red-600">full table data</strong> (Excel-friendly format).
                 </div>
                 <div class="mb-4 flex items-center justify-start">
                     <p class="text-sm text-gray-700">Normalization Method Used: <strong class="text-normalization-orange">${normalizationName}</strong>. Min/Max of adjusted data used for scaling.</p>
                 </div>
-                <div class="overflow-x-auto">
-                    <table>
+                <div class="overflow-x-visible"> <table>
                         <thead>
                             <tr>
-                                <th>Outlier Value Only</th>
-                                <th>Adjusted Value (Outliers Replaced)</th>
-                                <th>${normalizationName} Normalized Score (0 to 1)</th>
-                                <th>Rank (Highest Score = 1)</th>
+                                <th>Outlier(s) / Non-Numeric</th> 
+                                <th>Adjusted Value</th>
+                                <th>${normalizationName} Score (0 to 1)</th>
+                                <th>Rank (Highest=1)</th>
                             </tr>
                         </thead>
                         <tbody>
