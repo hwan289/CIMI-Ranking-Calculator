@@ -379,9 +379,10 @@
             // Clean up unnecessary trailing zeros after the decimal point
             s = s.replace(/(\.\d*?)(0+)$/, '$1').replace(/\.$/, '');
             
-            // Remove any *remaining* trailing zeros after the decimal, and the decimal point if it's the last character
-            // The toPrecision often leaves no trailing zeros, but this is a final cleanup.
-            s = s.replace(/0+$/, ''); 
+            // *** BUG FIX: REMOVED THE LINE BELOW ***
+            // s = s.replace(/0+$/, ''); 
+            
+            // This line is still needed to clean up if the above replacement left a trailing decimal
             s = s.replace(/\.$/, '');
             
             return s;
