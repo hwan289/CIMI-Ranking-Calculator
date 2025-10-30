@@ -357,21 +357,42 @@
 
         /**
          * Formats calculated values (quantiles, adjusted scores, normalized scores) to high precision.
+         * * *** FIXED: Added rounding to 12 decimals to remove floating point artifacts
+         * before formatting. ***
          */
         function formatNumber(num) {
             // Check if the input is a valid number before formatting
             if (typeof num !== 'number' || !isFinite(num)) {
                 return '';
             }
-            let s = num.toFixed(PRECISION);
-            s = s.replace(/0+$/, ''); 
+
+            // Step 1: Round to 12 decimal places to remove floating-point artifacts
+            // (e.g., ...000002 or ...9999995).
+            let roundedNum = parseFloat(num.toFixed(12));
+
+            // Step 2: Use toPrecision(15) on the *rounded* number to get
+            // all significant digits without excessive padding.
+            let s = roundedNum.toPrecision(PRECISION);
+            
+            // Further cleaning to remove scientific notation if possible and ensure standard form
+            if (s.includes('e')) {
+                 // Fallback to Number constructor to expand scientific notation
+                 s = Number(s).toString();
+            }
+            
+            // Clean up unnecessary trailing zeros after the decimal point
+            s = s.replace(/(\.\d*?)(0+)$/, '$1').replace(/\.$/, '');
+            
+            // This line is still needed to clean up if the above replacement left a trailing decimal
             s = s.replace(/\.$/, '');
+            
             return s;
         }
 
         /**
          * MODIFIED: Formats non-outlier, non-calculated values (user inputs) to a cleaner, lower precision
          * to avoid messy floating point artifacts, while preserving all significant digits.
+         * (This function is for INPUTS, formatNumber is for CALCULATIONS)
          */
         function simpleFormatNumber(num) {
              if (typeof num !== 'number' || !isFinite(num)) {
@@ -390,9 +411,6 @@
             
             // Clean up unnecessary trailing zeros after the decimal point
             s = s.replace(/(\.\d*?)(0+)$/, '$1').replace(/\.$/, '');
-            
-            // *** BUG FIX: THIS LINE WAS REMOVED TO FIX THE '0' BUG ***
-            // s = s.replace(/0+$/, ''); 
             
             // This line is still needed to clean up if the above replacement left a trailing decimal
             s = s.replace(/\.$/, '');
@@ -648,6 +666,7 @@
             // --- Step 8: Generate Display HTML for Outlier & Adjustment (Section 2 & 3) ---
             
             // Use high-precision formatting for all calculated/outlier values in the summary
+            // (This now uses the *corrected* formatNumber function)
             const outlierListHtml = allOutliers.length > 0
                 ? `<div class="code-output p-3 rounded-lg overflow-x-auto text-sm">
                        <span class="font-mono">${allOutliers.map(formatNumber).join(', ')}</span>
@@ -719,7 +738,7 @@
                         ${lowerListHtml}
                     </div>
                     <div>
-                        <h3 class="font-bold text-base text-red-700 mb-2 whitespace-nowrap">Adjustments Above Upper Fence (${adjustedUpperList.length} items)</h3>
+                        <h3 class="font-bold text-base text-red-700 mb-2 whitespace-nowKrap">Adjustments Above Upper Fence (${adjustedUpperList.length} items)</h3>
                         ${upperListHtml}
                     </div>
                 </div>
@@ -732,6 +751,7 @@
             // Generate rows for ALL data points, including non-numeric ones
             const tableRows = finalData.map(item => {
                 const isOutlier = item.isNumeric && item.isOutlier;
+                // (This now uses the *corrected* formatNumber function for the original outlier value)
                 const originalValueCell = item.isNumeric ? (isOutlier ? formatNumber(item.original) : '') : item.original;
                 
                 // *** THE KEY FIX IS HERE: Conditional formatting for Adjusted Value column ***
@@ -739,7 +759,7 @@
                 if (!item.isNumeric) {
                     adjustedValueDisplay = '';
                 } else if (isOutlier) {
-                    // Use high-precision format for calculated/adjusted outliers
+                    // Use high-precision format for calculated/adjusted outliers (via corrected formatNumber)
                     adjustedValueDisplay = formatNumber(item.adjusted); 
                 } else {
                     // Use simple format for non-outlier inputs to keep them clean
